@@ -1,0 +1,28 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forwarding Hub</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<div class="app">
+<aside><div class="brand">⚓ <span>Forwarding Hub</span></div><nav><button class="nav active" data-view="form">＋ New Job</button><button class="nav" data-view="jobs">▣ Jobs</button><button class="nav" data-view="logs">↻ Sync Logs</button></nav><div class="aside-note">Accurate Online Integration<br><small>Forwarding → Sales Order</small></div></aside>
+<main><header><div><h1>New Job / Sales Order Sync</h1><p>Create forwarding job and sync directly to Accurate Online.</p></div><div class="accurate-box"><span id="accurateState" class="pill">● Accurate disconnected</span><a id="connectAccurate" class="primary oauth-btn" href="/auth/accurate">Connect Accurate</a><button id="disconnectAccurate" class="secondary oauth-btn hidden" type="button">Disconnect</button></div></header>
+<section class="stats"><div><span>Total Jobs</span><b id="stTotal">0</b></div><div><span>Ready to Sync</span><b id="stReady">0</b></div><div><span>Synced</span><b id="stSynced">0</b></div><div><span>Failed</span><b id="stFailed">0</b></div></section>
+
+<section id="view-form" class="view grid">
+<div class="card form-card"><div class="card-title"><b>1</b> Job Information</div>
+<form id="jobForm"><input type="hidden" id="jobId">
+<div class="fields">
+<label>Job No*<input id="job_no" required placeholder="JOB-2608-012"></label><label>Customer*<input id="customer_name" required placeholder="PT Samudera Abadi"></label><label>Tanggal*<input id="job_date" type="date" required></label>
+<label>Customer No Accurate<input id="customer_no" placeholder="CUST-001"></label><label>PO Number<input id="po_number" placeholder="PO-2505-0789"></label><label>Vendor<input id="vendor_name" placeholder="PT Mitra Logistik"></label>
+<label>BL Number<input id="bl_number" placeholder="ONEJKT123456"></label><label>Container Number<input id="container_number" placeholder="TCLU1234567"></label><label>Vessel<input id="vessel" placeholder="Ever Glory"></label>
+<label>POL<input id="pol" placeholder="Jakarta"></label><label>POD<input id="pod" placeholder="Singapore"></label><label>Currency<select id="currency"><option>IDR</option><option>USD</option><option>SGD</option></select></label>
+<label>Exchange Rate<input id="exchange_rate" type="number" value="1" step="0.01"></label><label class="wide">Notes<textarea id="notes" placeholder="Import shipment - general cargo"></textarea></label>
+</div>
+<div class="charges-head"><div class="card-title"><b>2</b> Charges</div><button type="button" class="secondary" id="addCharge">＋ Add Charge</button></div>
+<table id="chargeTable"><thead><tr><th>Item No</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th></th></tr></thead><tbody></tbody></table>
+<div class="total">Total Charges: <strong id="grandTotal">0</strong></div>
+<div class="actions"><button type="submit" class="secondary">Save Draft</button><button type="button" id="syncBtn" class="primary">☁ Sync to Accurate</button></div>
+</form></div>
+<div class="card preview"><div class="card-title">Sales Order Preview</div><div id="previewStatus" class="status draft">DRAFT</div><dl id="preview"></dl><hr><h3>Line Items</h3><div id="previewCharges"></div><div class="preview-total"><span>Total Amount</span><b id="previewTotal">0</b></div><div id="message" class="message"></div></div>
+</section>
+
+<section id="view-jobs" class="view card hidden"><div class="card-title">Jobs</div><table><thead><tr><th>Job No</th><th>Customer</th><th>BL</th><th>Container</th><th>Total</th><th>Status</th><th>Accurate SO</th><th></th></tr></thead><tbody id="jobsBody"></tbody></table></section>
+<section id="view-logs" class="view card hidden"><div class="card-title">Sync Logs</div><table><thead><tr><th>Time</th><th>Job</th><th>Action</th><th>Status</th><th>Message</th></tr></thead><tbody id="logsBody"></tbody></table></section>
+</main></div><script src="/app.js"></script></body></html>
