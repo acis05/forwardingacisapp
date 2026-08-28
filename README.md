@@ -59,3 +59,7 @@ cp .env.example .env
 npm start
 ```
 A reachable PostgreSQL `DATABASE_URL` is required.
+
+
+## Report multi-currency (v3)
+Menu Reports memisahkan **Total IDR** dan **Total USD**. **Grand Total (IDR)** dihitung sebagai total transaksi IDR + (total setiap job USD x `exchange_rate` job tersebut). Job dengan mata uang selain IDR/USD tidak dimasukkan ke Grand Total dan akan memunculkan peringatan. Untuk job USD, isi `Exchange Rate` sebagai jumlah IDR untuk 1 USD (contoh: 16250).

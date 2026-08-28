@@ -64,10 +64,19 @@ app.get('/api/dashboard', async (_req, res) => {
   res.json(r.rows[0]);
 });
 
-app.get('/api/jobs', async (_req, res) => {
-  const r = await pool.query(`SELECT j.*,
-    COALESCE((SELECT SUM(qty*unit_price) FROM charges c WHERE c.job_id=j.id),0)::float8 total_amount
-    FROM jobs j ORDER BY j.id DESC`);
+app.get('/api/jobs', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const status = String(req.query.status || '').trim();
+  const from = String(req.query.from || '').trim();
+  const to = String(req.query.to || '').trim();
+  const params = []; const where = [];
+  if (q) { params.push(`%${q}%`); where.push(`(j.job_no ILIKE $${params.length} OR j.customer_name ILIKE $${params.length} OR COALESCE(j.customer_no,'') ILIKE $${params.length} OR COALESCE(j.bl_number,'') ILIKE $${params.length} OR COALESCE(j.container_number,'') ILIKE $${params.length} OR COALESCE(j.vendor_name,'') ILIKE $${params.length} OR COALESCE(j.vessel,'') ILIKE $${params.length} OR COALESCE(j.pol,'') ILIKE $${params.length} OR COALESCE(j.pod,'') ILIKE $${params.length} OR COALESCE(j.accurate_so_no,'') ILIKE $${params.length})`); }
+  if (status) { params.push(status); where.push(`j.status=$${params.length}`); }
+  if (from) { params.push(from); where.push(`j.job_date >= $${params.length}`); }
+  if (to) { params.push(to); where.push(`j.job_date <= $${params.length}`); }
+  const r = await pool.query(`SELECT j.*, COALESCE(SUM(c.qty*c.unit_price),0)::float8 total_amount
+    FROM jobs j LEFT JOIN charges c ON c.job_id=j.id ${where.length ? 'WHERE '+where.join(' AND ') : ''}
+    GROUP BY j.id ORDER BY j.job_date DESC,j.id DESC`, params);
   res.json(r.rows);
 });
 
@@ -128,6 +137,49 @@ app.put('/api/jobs/:id', async (req, res) => {
   } catch(e) {
     await client.query('ROLLBACK'); res.status(400).json({error:e.message});
   } finally { client.release(); }
+});
+
+
+app.delete('/api/jobs/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const job = await loadJob(id);
+  if (!job) return res.status(404).json({ error: 'Job tidak ditemukan' });
+  await pool.query('DELETE FROM jobs WHERE id=$1', [id]);
+  res.json({ ok: true, deleted: id, job_no: job.job_no });
+});
+
+app.get('/api/reports/jobs', async (req, res) => {
+  const q = String(req.query.q || '').trim(), status = String(req.query.status || '').trim();
+  const from = String(req.query.from || '').trim(), to = String(req.query.to || '').trim();
+  const params=[]; const where=[];
+  if(q){params.push(`%${q}%`);where.push(`(j.job_no ILIKE $${params.length} OR j.customer_name ILIKE $${params.length} OR COALESCE(j.bl_number,'') ILIKE $${params.length} OR COALESCE(j.container_number,'') ILIKE $${params.length} OR COALESCE(j.vendor_name,'') ILIKE $${params.length} OR COALESCE(j.accurate_so_no,'') ILIKE $${params.length})`)}
+  if(status){params.push(status);where.push(`j.status=$${params.length}`)}
+  if(from){params.push(from);where.push(`j.job_date >= $${params.length}`)}
+  if(to){params.push(to);where.push(`j.job_date <= $${params.length}`)}
+  const w=where.length?'WHERE '+where.join(' AND '):'';
+  const rows=await pool.query(`SELECT j.*,
+    COALESCE(SUM(c.qty*c.unit_price),0)::float8 total_amount,
+    CASE
+      WHEN UPPER(COALESCE(j.currency,'IDR'))='IDR' THEN COALESCE(SUM(c.qty*c.unit_price),0)
+      WHEN UPPER(COALESCE(j.currency,''))='USD' THEN COALESCE(SUM(c.qty*c.unit_price),0) * COALESCE(NULLIF(j.exchange_rate,0),0)
+      ELSE NULL
+    END::float8 idr_equivalent
+    FROM jobs j LEFT JOIN charges c ON c.job_id=j.id ${w}
+    GROUP BY j.id ORDER BY j.job_date DESC,j.id DESC`,params);
+  const summary=await pool.query(`SELECT
+    COUNT(DISTINCT j.id)::int total_jobs,
+    COUNT(DISTINCT j.id) FILTER(WHERE j.status='SYNCED')::int synced_jobs,
+    COALESCE(SUM(CASE WHEN UPPER(COALESCE(j.currency,'IDR'))='IDR' THEN c.qty*c.unit_price ELSE 0 END),0)::float8 total_idr,
+    COALESCE(SUM(CASE WHEN UPPER(COALESCE(j.currency,''))='USD' THEN c.qty*c.unit_price ELSE 0 END),0)::float8 total_usd,
+    COALESCE(SUM(CASE
+      WHEN UPPER(COALESCE(j.currency,'IDR'))='IDR' THEN c.qty*c.unit_price
+      WHEN UPPER(COALESCE(j.currency,''))='USD' THEN (c.qty*c.unit_price) * COALESCE(NULLIF(j.exchange_rate,0),0)
+      ELSE 0
+    END),0)::float8 grand_total_idr,
+    COUNT(DISTINCT j.id) FILTER (WHERE UPPER(COALESCE(j.currency,'')) NOT IN ('IDR','USD'))::int unsupported_currency_jobs,
+    COUNT(DISTINCT j.id) FILTER (WHERE UPPER(COALESCE(j.currency,''))='USD' AND COALESCE(j.exchange_rate,0)<=1)::int usd_jobs_rate_warning
+    FROM jobs j LEFT JOIN charges c ON c.job_id=j.id ${w}`,params);
+  res.json({summary:summary.rows[0],rows:rows.rows});
 });
 
 app.post('/api/jobs/:id/sync', async (req, res) => {
